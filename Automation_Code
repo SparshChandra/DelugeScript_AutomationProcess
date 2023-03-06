@@ -1,0 +1,62 @@
+get_attachments = zoho.crm.getRelatedRecords("Attachments","PropertyDatabase",get_id);
+if(get_attachments.size() > 0)
+{
+	for each  r in get_attachments
+	{
+		get_file = invokeurl
+		[
+			url :"https://www.zohoapis.com/crm/v3/PropertyDatabase/" + get_id + "/Attachments/" + r.getJSON("id")
+			type :GET
+			connection:"zoho_crm_v2_api_connection"
+		];
+		//info get_file.getFileContent();
+		dummy_map = {"Dummy_Key":get_file.getFileContent().tostring()};
+		//info dummy_map;
+		replace_value = if(dummy_map.get("Dummy_Key").contains("\r\n"),"\r\n","\n");
+		convert_into_list = "[" + dummy_map.get("Dummy_Key").replaceAll(replace_value,"],[") + "]";
+		x = 0;
+		id_list = List();
+		//info convert_into_list;
+		for each  r in convert_into_list.toList()
+		{
+			x = x + 1;
+			//info x +"---->"+r;
+			if(x > 1)
+			{
+				try 
+				{
+					if(r.get(130) != "" && r.get(128) != "" && r.get(132) != "" && r.get(133) != "")
+					{
+						insert_map = Map();
+						insert_map.put("Submitted_From",get_id.tolong());
+						insert_map.put("Last_Name",r.get(130));
+						insert_map.put("First_Name",r.get(128));
+						insert_map.put("Email",r.get(132));
+						insert_map.put("Phone_Number",if(r.get(27) != "",r.get(133).tostring(),""));
+						//Address
+						insert_map.put("Street",r.get(20));
+						insert_map.put("City",r.get(25));
+						insert_map.put("State",r.get(26));
+						insert_map.put("Zip_Code",if(r.get(27) != "",r.get(27).tostring(),""));
+						insert_map.put("Lead_Source","Nearby Owner");
+						full_address = r.get(5) + " " + r.get(13) + " " + r.get(14) + " " + r.get(15) + " " + r.get(16);
+						insert_map.put("Relationship_to_Property",full_address.tostring());
+						info insert_map;
+						resp_lead = zoho.crm.createRecord("Leads",insert_map);
+						if(resp_lead.getJSON("code") == "INVALID_DATA")
+						{
+							info resp_lead + "--------" + insert_map;
+						}
+						id_list.add(resp_lead.getJSON("id"));
+						info resp_lead;
+					}
+				}
+				catch (e)
+				{
+					info r;
+				}
+			}
+		}
+	}
+}
+return id_list;
